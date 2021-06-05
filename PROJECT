@@ -1,0 +1,16 @@
+domain: apstn.dev
+layout:
+- go.kubebuilder.io/v3
+projectName: image-pull-secret-controller
+repo: github.com/apstndb/workload-identity-image-pull-secrets
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: apstn.dev
+  group: example
+  kind: ImagePullSecret
+  path: github.com/apstndb/workload-identity-image-pull-secrets/api/v1alpha1
+  version: v1alpha1
+version: "3"

@@ -1,0 +1,48 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts/token
+  verbs:
+  - create
+- apiGroups:
+  - example.apstn.dev
+  resources:
+  - imagepullsecrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - example.apstn.dev
+  resources:
+  - imagepullsecrets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - example.apstn.dev
+  resources:
+  - imagepullsecrets/status
+  verbs:
+  - get
+  - patch
+  - update
