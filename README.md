@@ -1,3 +1,58 @@
+PoC of the controller which maintains ImagePullSecrets using short-lived access token supplied by Workload Identity Federation.
+
+## Disclaimer
+
+This code is only for proof of concept purpose, and I am not any responsible for any use of this code.
+
+## About
+
+* The controller maintains Secret resource compatible with `imagePullSecrets` for configuration in `ImagePullSecret` custom resource.
+* Compatible with all location of Google Container Registry and Artifact Registry
+* Short-lived credential for access token authentication method
+  * https://cloud.google.com/container-registry/docs/advanced-authentication?hl=en#token
+  * https://cloud.google.com/artifact-registry/docs/docker/authentication?hl=en#token
+* The credential is based on Workload Identity Federation for Kubernetes Engine cluster as a OIDC identity provider.
+  * https://cloud.google.com/iam/docs/access-resources-oidc?hl=en
+  * https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
+  * https://cloud.google.com/kubernetes-engine/docs/reference/rest/v1/projects.locations.clusters.well-known/getOpenid-configuration?hl=en
+
+### ImagePullSecret resource
+
+```
+apiVersion: example.apstn.dev/v1alpha1
+kind: ImagePullSecret
+metadata:
+  name: imagepullsecret-sample
+  namespace: default
+spec:
+  # federation targe GSA email
+  gsaEmail: image-puller@yourname-example-service-cba2.iam.gserviceaccount.com
+  # secret name for imagePullSecrets
+  secretName: image-pull-secret
+  # Subject Kubernetes service account name in same namespace
+  serviceAccountName: default
+  # Workload Identity pool provider name.
+  # Must be like `projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}/providers/${PROVIDER_ID}`
+  workloadIdentityPoolProvider: projects/628134195223/locations/global/workloadIdentityPools/pool-for-gke/providers/provider-for-gke
+```
+
+The controller will create the corresponding secret.
+
+```
+$ kubectl get secret image-pull-secret
+NAME                  TYPE                                  DATA   AGE
+image-pull-secret     kubernetes.io/dockerconfigjson        1      83s
+```
+
+### `kubectl get imagepullsecrets`
+
+```
+$ kubectl get imagepullsecrets.example.apstn.dev
+NAME                     SECRET              KSA_NAME   GSA_EMAIL                                                            PROVIDER                                                                                               CURRENT_EXPIRES_AT
+imagepullsecret-sample   image-pull-secret   default    image-puller@yourname-example-service-cba2.iam.gserviceaccount.com   projects/628134195223/locations/global/workloadIdentityPools/pool-for-gke/providers/provider-for-gke   2021-06-06T16:56:03Z
+```
+
+
 ## Example
 
 Example in `./terraform` directory makes two project.
@@ -28,38 +83,18 @@ $ make install deploy
 $ (cd terraform/stage2 && terraform apply -var-file ../.tfvars)
 ```
 
-### ImagePullSecret resource
-
-Terraform stage2 applies ImagePullSecret resource like below.
-
-```
-apiVersion: example.apstn.dev/v1alpha1
-kind: ImagePullSecret
-metadata:
-  name: imagepullsecret-sample
-  namespace: default
-spec:
-  gsaEmail: image-puller@yourname-example-service-cba2.iam.gserviceaccount.com
-  secretName: image-pull-secret
-  serviceAccountName: default
-  workloadIdentityPoolProvider: projects/628134195223/locations/global/workloadIdentityPools/pool-for-gke/providers/provider-for-gke
-```
-
-Example of `kubectl get imagepullsecrets`
+Eventually, `CURRENT_EXPIRES_AT` will be filled and the secret will be available.
 
 ```
 $ kubectl get imagepullsecrets.example.apstn.dev
 NAME                     SECRET              KSA_NAME   GSA_EMAIL                                                            PROVIDER                                                                                               CURRENT_EXPIRES_AT
 imagepullsecret-sample   image-pull-secret   default    image-puller@yourname-example-service-cba2.iam.gserviceaccount.com   projects/628134195223/locations/global/workloadIdentityPools/pool-for-gke/providers/provider-for-gke   2021-06-06T16:56:03Z
-```
 
-Corresponding secret will be created.
-
-```
 $ kubectl get secret image-pull-secret
 NAME                  TYPE                                  DATA   AGE
 image-pull-secret     kubernetes.io/dockerconfigjson        1      83s
 ```
+
 
 ### Use the secret
 
