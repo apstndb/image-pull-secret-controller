@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	examplev1alpha1 "github.com/apstndb/workload-identity-image-pull-secrets/api/v1alpha1"
-	"github.com/apstndb/workload-identity-image-pull-secrets/controllers"
+	examplev1alpha1 "github.com/apstndb/image-pull-secret-controller/api/v1alpha1"
+	"github.com/apstndb/image-pull-secret-controller/controllers"
 	//+kubebuilder:scaffold:imports
 )
 

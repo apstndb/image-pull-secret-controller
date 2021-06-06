@@ -30,7 +30,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	examplev1alpha1 "github.com/apstndb/workload-identity-image-pull-secrets/api/v1alpha1"
+	examplev1alpha1 "github.com/apstndb/image-pull-secret-controller/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 

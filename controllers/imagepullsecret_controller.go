@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	examplev1alpha1 "github.com/apstndb/workload-identity-image-pull-secrets/api/v1alpha1"
+	examplev1alpha1 "github.com/apstndb/image-pull-secret-controller/api/v1alpha1"
 )
 
 // ImagePullSecretReconciler reconciles a ImagePullSecret object

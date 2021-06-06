@@ -1,4 +1,4 @@
-module github.com/apstndb/workload-identity-image-pull-secrets
+module github.com/apstndb/image-pull-secret-controller
 
 go 1.16
 
