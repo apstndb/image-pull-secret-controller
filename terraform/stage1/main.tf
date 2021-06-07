@@ -9,11 +9,11 @@ variable "kubernetes_service_account_namespace" {}
 variable "image_puller_gsa_name" {}
 variable "artifact_registry_repo_name" {}
 variable "org_id" {
-  type = string
+  type    = string
   default = ""
 }
 variable "folder_id" {
-  type = string
+  type    = string
   default = ""
 }
 variable "billing_account_id" {}
@@ -31,13 +31,13 @@ module "cluster_project" {
   source  = "terraform-google-modules/project-factory/google"
   version = "~> 10.1"
 
-  billing_account = var.billing_account_id
-  org_id = var.org_id
-  folder_id = var.folder_id
-  name = var.cluster_project_prefix
-  random_project_id = true
+  billing_account         = var.billing_account_id
+  org_id                  = var.org_id
+  folder_id               = var.folder_id
+  name                    = var.cluster_project_prefix
+  random_project_id       = true
   default_service_account = "keep"
-  auto_create_network = true
+  auto_create_network     = true
   activate_apis = [
     "container.googleapis.com",
   ]
@@ -48,10 +48,10 @@ module "service_project" {
   source  = "terraform-google-modules/project-factory/google"
   version = "~> 10.1"
 
-  billing_account = var.billing_account_id
-  org_id = var.org_id
-  folder_id = var.folder_id
-  name = var.service_project_prefix
+  billing_account   = var.billing_account_id
+  org_id            = var.org_id
+  folder_id         = var.folder_id
+  name              = var.service_project_prefix
   random_project_id = true
   activate_apis = [
     "artifactregistry.googleapis.com",
@@ -61,13 +61,13 @@ module "service_project" {
 
 resource "google_service_account" "image_puller" {
   provider   = google
-  project = module.service_project.project_id
+  project    = module.service_project.project_id
   account_id = var.image_puller_gsa_name
 }
 
 locals {
-  kubernetes_service_account_subject = "system:serviceaccount:${var.kubernetes_service_account_namespace}:${var.kubernetes_service_account_name}"
-  workload_identity_pool_name = "projects/${module.service_project.project_number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.gke_pool.workload_identity_pool_id}"
+  kubernetes_service_account_subject   = "system:serviceaccount:${var.kubernetes_service_account_namespace}:${var.kubernetes_service_account_name}"
+  workload_identity_pool_name          = "projects/${module.service_project.project_number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.gke_pool.workload_identity_pool_id}"
   workload_identity_pool_provider_name = "${local.workload_identity_pool_name}/providers/${google_iam_workload_identity_pool_provider.gke_pool.workload_identity_pool_provider_id}"
 }
 resource "google_service_account_iam_member" "image_puller_binding" {
@@ -88,13 +88,13 @@ resource "google_artifact_registry_repository_iam_member" "image_puller_is_artif
 
 resource "google_iam_workload_identity_pool" "gke_pool" {
   provider                  = google-beta
-  project = module.service_project.project_id
+  project                   = module.service_project.project_id
   workload_identity_pool_id = var.workload_identity_pool_id
 }
 
 resource "google_iam_workload_identity_pool_provider" "gke_pool" {
   provider                           = google-beta
-  project = module.service_project.project_id
+  project                            = module.service_project.project_id
   workload_identity_pool_id          = google_iam_workload_identity_pool.gke_pool.workload_identity_pool_id
   workload_identity_pool_provider_id = var.workload_identity_pool_provider_id
   attribute_mapping = {
@@ -102,15 +102,15 @@ resource "google_iam_workload_identity_pool_provider" "gke_pool" {
   }
   oidc {
     allowed_audiences = []
-    issuer_uri = "https://container.googleapis.com/v1/projects/${google_container_cluster.cluster.project}/locations/${google_container_cluster.cluster.location}/clusters/${google_container_cluster.cluster.name}"
+    issuer_uri        = "https://container.googleapis.com/v1/projects/${google_container_cluster.cluster.project}/locations/${google_container_cluster.cluster.location}/clusters/${google_container_cluster.cluster.name}"
   }
 }
 
 resource "google_artifact_registry_repository" "repo" {
-  provider   = google-beta
-  project = module.service_project.project_id
+  provider = google-beta
+  project  = module.service_project.project_id
 
-  labels = {}
+  labels        = {}
   location      = "us-central1"
   repository_id = var.artifact_registry_repo_name
   description   = "private docker repository"
@@ -118,10 +118,10 @@ resource "google_artifact_registry_repository" "repo" {
 }
 
 resource "google_container_cluster" "cluster" {
-  provider = google
-  project = module.cluster_project.project_id
-  name     = var.cluster_name
-  location = var.cluster_location
+  provider         = google
+  project          = module.cluster_project.project_id
+  name             = var.cluster_name
+  location         = var.cluster_location
   enable_autopilot = var.enable_autopilot
   vertical_pod_autoscaling {
     enabled = true
