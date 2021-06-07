@@ -15,6 +15,7 @@ This code is only for proof of concept purpose, and I am not any responsible for
 * The credential is based on Workload Identity Federation for Kubernetes Engine cluster as a OIDC identity provider.
   * https://cloud.google.com/iam/docs/access-resources-oidc?hl=en
   * https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
+  * https://github.com/kubernetes/enhancements/blob/master/keps/sig-auth/1205-bound-service-account-tokens
   * https://cloud.google.com/kubernetes-engine/docs/reference/rest/v1/projects.locations.clusters.well-known/getOpenid-configuration?hl=en
 
 ### ImagePullSecret resource
