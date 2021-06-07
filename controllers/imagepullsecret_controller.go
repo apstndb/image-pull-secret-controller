@@ -23,6 +23,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/apstndb/image-pull-secret-controller/controllers/internal/tokensource"
 	"golang.org/x/oauth2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +36,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	examplev1alpha1 "github.com/apstndb/image-pull-secret-controller/api/v1alpha1"
+)
+
+const (
+	cloudPlatformScope = "https://www.googleapis.com/auth/cloud-platform"
+	userInfoEmailScope = "https://www.googleapis.com/auth/userinfo.email"
 )
 
 // ImagePullSecretReconciler reconciles a ImagePullSecret object
@@ -63,55 +69,94 @@ func (r *ImagePullSecretReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	l := log.FromContext(ctx)
 
 	// your logic here
-	reqb, _ := json.Marshal(req)
 	var imagePullSecret examplev1alpha1.ImagePullSecret
-	err := r.Get(ctx, req.NamespacedName, &imagePullSecret)
-	if err != nil {
+	if err := r.Get(ctx, req.NamespacedName, &imagePullSecret); err != nil {
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
-	} else {
-		resb, _ := json.Marshal(imagePullSecret)
-		l.Info("Reconcile:", "reqb", string(reqb), "resource", string(resb))
 	}
 
+	reqb, _ := json.Marshal(req)
+	resb, _ := json.Marshal(imagePullSecret)
+	l.Info("Reconcile:", "reqb", string(reqb), "resource", string(resb))
+
 	if err := r.do(ctx, &imagePullSecret); err != nil {
+		l.Error(err, "r.do() failed")
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 	}
 
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 }
 
-func (r *ImagePullSecretReconciler) do(ctx context.Context, res *examplev1alpha1.ImagePullSecret) error {
+func (r *ImagePullSecretReconciler) tokenSource(ctx context.Context, res *examplev1alpha1.ImagePullSecret) (oauth2.TokenSource, error) {
 	gsaEmail := res.Spec.GsaEmail
-	secretNamespace := res.Namespace
-	secretName := res.Spec.SecretName
 	serviceAccountName := res.Spec.ServiceAccountName
 	serviceAccountNamespace := res.Namespace
 	workloadIdentityPoolProvider := fmt.Sprintf("//iam.googleapis.com/%s", res.Spec.WorkloadIdentityPoolProvider)
 
-	tokenRequestResp, err := CreateTokenForAudiences(ctx, r.ClientSet, serviceAccountNamespace, serviceAccountName, []string{workloadIdentityPoolProvider})
+	kts, err := tokensource.KubernetesTokenRequestTokenSource(ctx, r.ClientSet,
+		&tokensource.KubernetsTokenRequestTokenConfig{
+			ServiceAccountNamespace: serviceAccountNamespace,
+			ServiceAccountName:      serviceAccountName,
+			Audiences:               []string{workloadIdentityPoolProvider},
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	stsTs, err := tokensource.OidcStsTokenSource(ctx, workloadIdentityPoolProvider, kts)
+	if err != nil {
+		return nil, err
+	}
+
+
+	scopes := []string{cloudPlatformScope, userInfoEmailScope}
+	impTs, err := tokensource.ImpersonateTokenSource(ctx, gsaEmail, stsTs, scopes...)
+	if err != nil {
+		return nil, err
+	}
+
+
+	// Wrap to avoid to issue token repeatedly for tokenInfo call
+	return oauth2.ReuseTokenSource(nil, impTs), nil
+}
+
+func (r *ImagePullSecretReconciler) do(ctx context.Context, res *examplev1alpha1.ImagePullSecret) error {
+	ts, err := r.tokenSource(ctx, res)
 	if err != nil {
 		return err
 	}
 
-	stsTokenResp, err := ExchangeJwtForFederatedToken(ctx, workloadIdentityPoolProvider, tokenRequestResp.Status.Token)
+	// Print token information
+	tokeninfoResp, err := tokenInfo(ctx, ts)
+	if err != nil {
+		return err
+	}
+	_ = json.NewEncoder(os.Stderr).Encode(tokeninfoResp)
+
+	t, err := ts.Token()
 	if err != nil {
 		return err
 	}
 
-	at, err := ImpersonateAccessToken(ctx, res.Spec.GsaEmail, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: stsTokenResp.AccessToken}))
+	err = r.upsertDockerConfigSecret(ctx, res, t)
 	if err != nil {
 		return err
 	}
-	tokeninfoResp, err := TokenInfo(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: at.GetAccessToken()}))
-	if err != nil {
-		return err
-	}
-	json.NewEncoder(os.Stdout).Encode(tokeninfoResp)
 
-	b, err := GenerateDockerConfigJson(gsaEmail, at.GetAccessToken())
+	// Update status only if succeed
+	res.Status.ExpiresAt = metav1.NewTime(t.Expiry)
+	return r.Status().Update(ctx, res)
+}
+
+func (r *ImagePullSecretReconciler) upsertDockerConfigSecret(ctx context.Context, res *examplev1alpha1.ImagePullSecret, token *oauth2.Token) error {
+	gsaEmail := res.Spec.GsaEmail
+	secretNamespace := res.Namespace
+	secretName := res.Spec.SecretName
+
+	b, err := generateDockerConfigJson(gsaEmail, token.AccessToken)
 	if err != nil {
 		return err
 	}
+
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: secretNamespace,
@@ -123,15 +168,8 @@ func (r *ImagePullSecretReconciler) do(ctx context.Context, res *examplev1alpha1
 	err = r.Create(ctx, secret)
 	if errors.IsAlreadyExists(err) {
 		err = r.Update(ctx, secret)
-		if err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
 	}
-	res.Status.ExpiresAt = metav1.NewTime(at.GetExpireTime().AsTime())
-
-	return r.Status().Update(ctx, res)
+	return err
 }
 
 // SetupWithManager sets up the controller with the Manager.

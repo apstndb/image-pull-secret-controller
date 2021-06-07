@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go v0.81.0
 	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.2
+	github.com/salrashid123/oauth2/oidcfederated v0.0.0-20210527113859-ca6b525517e2
 	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c
 	google.golang.org/api v0.47.0
 	google.golang.org/genproto v0.0.0-20210513213006-bf773b8c8384
